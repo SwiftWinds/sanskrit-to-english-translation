@@ -10,7 +10,12 @@ here due to development time constraints.
 import datasets
 import tokenizers
 import torch
+import os
 
+# Create a cache folder, used to speed up expensive operations between runs
+from pathlib import Path
+CACHE_FOLDER = "./cache"
+Path(CACHE_FOLDER).mkdir(parents=True, exist_ok=True)
 
 def train_itihasa_tokenizers(merged_data):
     """
@@ -27,9 +32,14 @@ def train_itihasa_tokenizers(merged_data):
             sn_tokenizer        A tokenizer trained on the Sanskrit dataset
             
     """
+
     # Using Byte-Pair Encoding for tokenization
     en_bpe = tokenizers.Tokenizer(tokenizers.models.BPE())
     sn_bpe = tokenizers.Tokenizer(tokenizers.models.BPE())
+
+    en_bpe_cache_file, sn_bpe_cache_file = CACHE_FOLDER + "/en_bpe", CACHE_FOLDER + "/sn_bpe"
+    if os.path.isfile(en_bpe_cache_file) and os.path.isfile(sn_bpe_cache_file):
+        return (en_bpe.from_file(en_bpe_cache_file), sn_bpe.from_file(sn_bpe_cache_file))
 
     # Use whitespace as a word delimiter
     en_bpe.pre_tokenizer = tokenizers.pre_tokenizers.Whitespace()
@@ -43,6 +53,9 @@ def train_itihasa_tokenizers(merged_data):
     trainer = tokenizers.trainers.BpeTrainer(special_tokens=["[UNK]", "[CLS]", "[SEP]", "[PAD]", "[MASK]"])
     en_bpe.train_from_iterator(english_corpus_iter, length=corpus_length, trainer=trainer)
     sn_bpe.train_from_iterator(sanskrit_corpus_iter, length=corpus_length)
+
+    en_bpe.save(CACHE_FOLDER + "/en_bpe")
+    sn_bpe.save(CACHE_FOLDER + "/sn_bpe")
 
     return (en_bpe, sn_bpe)
 
