@@ -104,6 +104,8 @@ def train_model(model, train_dataloader, optimizer, criterion, nepochs):
             # TODO Need tensorboard / the pytorch equivalent
             print(loss)
 
+# TODO Would be nice to have args / a config file containing hyperparams
+# That would prevent us from having to edit this file to tune them.
 if __name__ == "__main__":
     # Download the Itihasa dataset
     training_data, validation_data, test_data = itihasa.load_itihasa()
