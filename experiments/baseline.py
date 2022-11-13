@@ -115,6 +115,10 @@ if __name__ == "__main__":
     # Train the tokenizers on the existing corpora
     tokenizers = itihasa.train_itihasa_tokenizers(merged_data)
     
+    # TODO Note - training bottleneck coming from loading samples from the
+    # ItihasaDataset. Reducing this load time would result in significant
+    # speedup.
+
     # Create Torch Datasets for each split of the Itihasa dataset
     # (useful to get training up-and-running)
     itihasa_dataset_train = itihasa.ItihasaDataset(training_data, tokenizers)
@@ -123,15 +127,17 @@ if __name__ == "__main__":
 
     # Pads all sentences in a batch. Note that source and target
     # batches are padded separately.
-    pad_parallel_pair = (
-        lambda parallel_pair:
-            tuple(torch.nn.utils.rnn.pad_sequence(sentence)
-             for sentence in parallel_pair))
+    def pad_parallel_pair(batch_of_parallel_pairs):
+        batch_of_source_sentences = [src for src, tgt in batch_of_parallel_pairs]
+        batch_of_target_sentences = [tgt for src, tgt in batch_of_parallel_pairs]
+
+        return (torch.nn.utils.rnn.pad_sequence(batch_of_source_sentences),
+                torch.nn.utils.rnn.pad_sequence(batch_of_target_sentences))
 
     # Create dataloaders for batching
     train_dataloader = torch.utils.data.DataLoader(
         itihasa_dataset_train, batch_size=3, shuffle=True,
-        collate_fn=pad_parallel_pair)
+        collate_fn=pad_parallel_pair, num_workers=4)
     val_dataloader = torch.utils.data.DataLoader(
         itihasa_dataset_val, batch_size=64, shuffle=True)
     test_dataloader = torch.utils.data.DataLoader(
