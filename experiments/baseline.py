@@ -125,12 +125,12 @@ if __name__ == "__main__":
     # batches are padded separately.
     pad_parallel_pair = (
         lambda parallel_pair:
-            (torch.nn.utils.rnn.pad_sequence(sentence)
+            tuple(torch.nn.utils.rnn.pad_sequence(sentence)
              for sentence in parallel_pair))
 
     # Create dataloaders for batching
     train_dataloader = torch.utils.data.DataLoader(
-        itihasa_dataset_train, batch_size=2, shuffle=True,
+        itihasa_dataset_train, batch_size=3, shuffle=True,
         collate_fn=pad_parallel_pair)
     val_dataloader = torch.utils.data.DataLoader(
         itihasa_dataset_val, batch_size=64, shuffle=True)
