@@ -16,8 +16,8 @@ def test_tokenization():
     en_ground_truth = training_data[idx]['translation']['en']
     sn_ground_truth = training_data[idx]['translation']['sn']
     sn_tokens, en_tokens = itihasa_dataset_train.__getitem__(idx)
-    en_reconstructed = en_tokenizer.decode(en_tokens)
-    sn_reconstructed = sn_tokenizer.decode(sn_tokens)
+    en_reconstructed = en_tokenizer.decode(en_tokens.tolist())
+    sn_reconstructed = sn_tokenizer.decode(sn_tokens.tolist())
 
     # Ensure that the string reconstructed from the token IDs 
     # matches the original input. Replacing all spaces with ""

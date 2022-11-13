@@ -99,7 +99,8 @@ def preprocess_parallel_pair(
     tokenized_en = en_tokenizer.encode(raw_english_sentence)
     tokenized_sn = sn_tokenizer.encode(raw_sanskrit_sentence)
 
-    return (tokenized_en.ids, tokenized_sn.ids)
+    return (torch.LongTensor(tokenized_en.ids),
+            torch.LongTensor(tokenized_sn.ids))
 
 
 class ItihasaDataset(torch.utils.data.Dataset):
