@@ -30,7 +30,7 @@ class TransformerBaseline(torch.nn.Module):
 
         self.transformer_model = torch.nn.Transformer(d_model=d_model)
         self.input_embedding = torch.nn.Linear(src_vocab_size, d_model)     # TODO Different src/tgt embeddings?
-        self.output_embedding = torch.nn.Linear(d_model, sn_vocab_size)
+        self.output_embedding = torch.nn.Linear(d_model, src_vocab_size)
         self.softmax = torch.nn.Softmax(-1)
 
         self.src_vocab_size = src_vocab_size
@@ -80,7 +80,9 @@ class TransformerBaseline(torch.nn.Module):
             # TODO Could use naive decoding or beam search here.
             raise NotImplementedError("Have not implemented autoregressive prediction yet")
 
-def train_model(model, train_dataloader, optimizer, criterion, nepochs):
+def train_model(
+    model, train_dataloader, vocab_sizes, optimizer, criterion, nepochs):
+
     for epoch in range(nepochs):
         for sn_train, en_train in train_dataloader:
             # Forward pass
@@ -88,7 +90,7 @@ def train_model(model, train_dataloader, optimizer, criterion, nepochs):
                 src_sentence=sn_train, tgt_sentence=en_train)
 
             # Ground truth for loss
-            one_hot_tgt = torch.nn.functional.one_hot(en_train, en_vocab_size)
+            one_hot_tgt = torch.nn.functional.one_hot(en_train, vocab_sizes['en'])
 
             # Squash along batch size, giving shape [batch_size * timesteps, num_classes]
             # This puts the tensors in an acceptable shape for loss computation.
@@ -104,9 +106,23 @@ def train_model(model, train_dataloader, optimizer, criterion, nepochs):
             # TODO Need tensorboard / the pytorch equivalent
             print(loss)
 
-# TODO Would be nice to have args / a config file containing hyperparams
-# That would prevent us from having to edit this file to tune them.
-if __name__ == "__main__":
+# TODO Could split this function up
+def build_itihasa_datasets_for_training(batch_size, num_workers):
+    """
+    Downloads the itihasa dataset, trains a tokenizer, calculates vocab
+    sizes, and builds dataloaders for training in pytorch.
+
+    Args:
+        batch_size      Batch size for training
+        num_workers     Num parallel workers for dataset loading
+
+    Returns a tuple (dataloaders, vocab_sizes):
+        dataloaders     A dictionary with keys 'train', 'val', and 'test'
+                        to get dataloaders for each split of the dataset
+        vocab_sizes     A dictionary with keys 'en', 'sn' to get the
+                        English and Sanskrit vocab sizes, respectively
+        
+    """
     # Download the Itihasa dataset
     training_data, validation_data, test_data = itihasa.load_itihasa()
 
@@ -138,25 +154,40 @@ if __name__ == "__main__":
 
     # Create dataloaders for batching
     train_dataloader = torch.utils.data.DataLoader(
-        itihasa_dataset_train, batch_size=3, shuffle=True,
-        collate_fn=pad_parallel_pair, num_workers=4)
+        itihasa_dataset_train, batch_size=batch_size, shuffle=True,
+        collate_fn=pad_parallel_pair, num_workers=num_workers)
     val_dataloader = torch.utils.data.DataLoader(
-        itihasa_dataset_val, batch_size=64, shuffle=True)
+        itihasa_dataset_val, batch_size=batch_size, shuffle=True)
     test_dataloader = torch.utils.data.DataLoader(
-        itihasa_dataset_test, batch_size=64, shuffle=True)
+        itihasa_dataset_test, batch_size=batch_size, shuffle=True)
+
+    dataloaders = {'train': train_dataloader, 'val': val_dataloader,
+                   'test': test_dataloader}
 
     # Get tokenizers + vocab size from dataset
     sn_tokenizer, en_tokenizer = tokenizers
     en_vocab_size = en_tokenizer.get_vocab_size()
     sn_vocab_size = sn_tokenizer.get_vocab_size()
 
+    vocab_sizes = {'en': en_vocab_size, 'sn': sn_vocab_size}
+
+    return (dataloaders, vocab_sizes)
+   
+
+# TODO Would be nice to have args / a config file containing hyperparams
+# That would prevent us from having to edit this file to tune them.
+if __name__ == "__main__":
+    dataloaders, vocab_sizes = build_itihasa_datasets_for_training(
+        batch_size=2, num_workers=4)
+    
     # Instantiate model
     baseline_model = TransformerBaseline(
-        d_model=512, src_vocab_size=sn_vocab_size, tgt_vocab_size=en_vocab_size,
-        training_mode=True)
+        d_model=512, src_vocab_size=vocab_sizes['sn'],
+        tgt_vocab_size=vocab_sizes['en'], training_mode=True)
 
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(params=baseline_model.parameters())
 
     # Perform training
-    train_model(baseline_model, train_dataloader, optimizer, criterion, nepochs=20)
+    train_model(
+        baseline_model, dataloaders['train'], vocab_sizes, optimizer, criterion, nepochs=20)
